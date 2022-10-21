@@ -1,0 +1,316 @@
+---
+title: "ARIMA Model"
+output:
+  word_document: default
+  html_document: default
+date: "2022-08-15"
+---
+
+
+# Load Data
+```{r}
+library(readr)
+NTDOY <- read_csv("D:/2022 Semester 2/MATH3004/RStudio/NTDOY.csv")
+NTDOY <- subset(NTDOY, select = c("Date", "High"))
+NTDOY$Date <- seq(as.Date("2017-05-01"),as.Date("2022-07-25"),by = 7)
+#View(NTDOY)
+NTDOY <- NTDOY[1:266,]
+NTDOYTrain <- NTDOY[1:261,]
+NTDOYTest <- NTDOY[262:266,]
+View(NTDOYTrain)
+```
+
+# CWP Function
+```{r}
+cwp <- function (object){
+  coef <- coef(object)
+  if (length(coef) > 0) {
+    mask <- object$mask
+    sdev <- sqrt(diag(vcov(object)))
+    t.rat <- rep(NA, length(mask))
+    t.rat[mask] <- coef[mask]/sdev
+    pt <- 2 * pnorm(-abs(t.rat))
+    setmp <- rep(NA, length(mask))
+    setmp[mask] <- sdev
+    sum <- rbind(coef, setmp, t.rat, pt)
+    dimnames(sum) <- list(c("coef", "s.e.", "t ratio", "p-value"),
+                          names(coef))
+    return(sum)
+  }
+}
+```
+
+
+
+
+# Basic Plots
+```{r}
+plot(NTDOYTrain$Date, NTDOYTrain$High, type = "l",
+     ylab = "Stock Price High (USD)",
+     xlab = "Year")
+```
+
+
+
+```{r}
+plot.ts(NTDOYTrain$High,
+        main = "Nintendo Co. Weekly Stock Price High",
+        ylab = "Stock Price High (USD)")
+```
+
+
+
+# Model Identification
+```{r}
+NTDOYLog <- log(NTDOYTrain$High)
+NTDOYHigh <- NTDOYTrain$High
+
+par(mfcol=c(2,3))
+plot.ts(NTDOYHigh)
+plot.ts(NTDOYLog)
+plot.ts(diff(NTDOYHigh))
+plot.ts(diff(NTDOYLog))
+plot.ts(diff(diff(NTDOYHigh)))
+plot.ts(diff(diff(NTDOYLog)))
+```
+
+
+```{r}
+par(mfcol = c(2,3))
+acf(NTDOYHigh, lag.max = 64, plot = T)
+pacf(NTDOYHigh, lag.max = 64, plot = T)
+acf(diff(NTDOYHigh), lag.max = 64, plot = T)
+pacf(diff(NTDOYHigh), lag.max = 64, plot = T)
+acf(diff(diff(NTDOYHigh)), lag.max = 64, plot = T)
+pacf(diff(diff(NTDOYHigh)), lag.max = 64, plot = T)
+```
+```{r}
+par(mar = c(3,3,3,0), mfcol = c(2,3))
+acf(NTDOYLog, lag.max = 64, plot = T, main = 'NTDOY ACF (d=0)')
+pacf(NTDOYLog, lag.max = 64, plot = T, main = 'NTDOY PACF (d=0)')
+acf(diff(NTDOYLog), lag.max = 64, plot = T, main = 'NTDOY ACF (d=1)')
+pacf(diff(NTDOYLog), lag.max = 64, plot = T, main = 'NTDOY PACF (d=1)')
+acf(diff(diff(NTDOYLog)), lag.max = 64, plot = T, main = 'NTDOY ACF (d=2)')
+pacf(diff(diff(NTDOYLog)), lag.max = 64, plot = T, main = 'NTDOY PACF (d=2)')
+```
+
+## Difference = 1
+```{r}
+# d = 1
+fit.011.log <- arima(NTDOYLog, order = c(0,1,1))
+fit.012.log <- arima(NTDOYLog, order = c(0,1,2))
+fit.013.log <- arima(NTDOYLog, order = c(0,1,3))
+fit.014.log <- arima(NTDOYLog, order = c(0,1,4))
+fit.110.log <- arima(NTDOYLog, order = c(1,1,0))
+fit.111.log <- arima(NTDOYLog, order = c(1,1,1))
+fit.112.log <- arima(NTDOYLog, order = c(1,1,2))
+fit.113.log <- arima(NTDOYLog, order = c(1,1,3))
+fit.114.log <- arima(NTDOYLog, order = c(1,1,4))
+fit.211.log <- arima(NTDOYLog, order = c(2,1,1))
+fit.212.log <- arima(NTDOYLog, order = c(2,1,2))
+
+
+
+cwp(fit.011.log)
+cwp(fit.012.log)
+cwp(fit.013.log)
+cwp(fit.014.log)
+cwp(fit.110.log)
+cwp(fit.111.log)
+cwp(fit.112.log)
+cwp(fit.113.log)
+cwp(fit.114.log)
+cwp(fit.211.log)
+cwp(fit.212.log)
+```
+
+
+
+## Difference = 2 
+```{r}
+# d = 2
+fit.120.log <- arima(NTDOYLog, order = c(1,2,0))
+fit.220.log <- arima(NTDOYLog, order = c(2,2,0))
+fit.021.log <- arima(NTDOYLog, order = c(0,2,1))
+fit.121.log <- arima(NTDOYLog, order = c(1,2,1))
+fit.221.log <- arima(NTDOYLog, order = c(2,2,1))
+
+cwp(fit.120.log)
+cwp(fit.220.log)
+cwp(fit.021.log)
+cwp(fit.121.log)
+cwp(fit.221.log)
+```
+
+
+# Model Diagnostics
+
+## ARIMA(1,1,1) 
+```{r}
+library(tactile)
+xyplot(fit.111.log)
+hist(fit.111.log$resid, br=12)
+shapiro.test(fit.111.log$resid)
+```
+
+
+
+## ARIMA(1,2,0) 
+```{r}
+xyplot(fit.120.log)
+hist(fit.120.log$resid, br=12)
+shapiro.test(fit.120.log$resid)
+```
+
+## ARIMA(2,2,0) 
+```{r}
+xyplot(fit.220.log)
+hist(fit.220.log$resid, br=12)
+shapiro.test(fit.220.log$resid)
+```
+
+## ARIMA(2,1,2)
+```{r}
+xyplot(fit.212.log)
+hist(fit.212.log$resid, br=12)
+shapiro.test(fit.212.log$resid)
+```
+
+
+# Forecasting
+
+## ARIMA(1,1,1) Log Data
+```{r}
+fit.model111 <- fitted(fit.111.log)
+plot(NTDOYLog, type='l', main = 'NTDOY Actual vs ARIMA(1,1,1)', ylab = 'NTDOY Stock Price (log)', xlab = 'Time (Weeks)')
+lines(fit.model111,col="red")
+```
+
+## ARIMA(1,2,0) Log Data
+```{r}
+fit.model120 <- fitted.values(fit.120.log)
+plot(NTDOYLog, type='l', main = 'NTDOY Actual vs ARIMA(1,2,0)', ylab = 'NTDOY Stock Price (log)', xlab = 'Time (Weeks)')
+lines(fit.model120,col="red")
+```
+
+## ARIMA(2,1,2) Log Data
+```{r}
+fit.model212 <- fitted.values(fit.212.log)
+plot.ts(NTDOYLog, type='l', main = 'NTDOY Actual vs ARIMA(2,1,2)', ylab = 'NTDOY Stock Price (log)', xlab = 'Time (Weeks)')
+lines(fit.model212,col="red")
+```
+
+
+
+
+```{r}
+fit.111.log
+fit.212.log
+```
+
+
+
+
+
+# Model Accuracy
+
+
+## Accuracy on historical data
+```{r}
+library(MLmetrics)
+cat('MAPE\n')
+cat('Model A(1,1,1): ', MAPE(fit.model111, NTDOYLog), '\n')
+cat('Model A(1,2,0): ', MAPE(fit.model120, NTDOYLog), '\n')
+cat('Model A(2,1,2): ', MAPE(fit.model212, NTDOYLog), '\n')
+cat('Model RNN3:     ', MAPE(log(rnn_pred_train_actual), log(y_train_actual)), '\n')
+cat('Model RNN4:     ', MAPE(log(rnn_pred_train_actual2), log(y_train_actual)), '\n')
+cat('MSE\n')
+cat('Model A(1,1,1): ', MSE(fit.model111, NTDOYLog), '\n')
+cat('Model A(1,2,0): ', MSE(fit.model120, NTDOYLog), '\n')
+cat('Model A(2,1,2): ', MSE(fit.model212, NTDOYLog), '\n')
+cat('Model RNN3:     ', MSE(log(rnn_pred_train_actual), log(y_train_actual)), '\n')
+cat('Model RNN4:     ', MSE(log(rnn_pred_train_actual2), log(y_train_actual)), '\n')
+cat('RMSE\n')
+cat('Model A(1,1,1): ', RMSE(fit.model111, NTDOYLog), '\n')
+cat('Model A(1,2,0): ', RMSE(fit.model120, NTDOYLog), '\n')
+cat('Model A(2,1,2): ', RMSE(fit.model212, NTDOYLog), '\n')
+cat('Model RNN3:     ', RMSE(log(rnn_pred_train_actual), log(y_train_actual)), '\n')
+cat('Model RNN4:     ', RMSE(log(rnn_pred_train_actual2), log(y_train_actual)), '\n')
+```
+
+
+# Forecasting
+
+```{r}
+library(forecast)
+forecast111 <- forecast(fit.111.log, h=5) 
+plot(forecast111)
+forecast212 <- forecast(fit.212.log, h = 5) 
+plot(forecast212)
+```
+
+```{r}
+NTDOYinput <- seq(1,266, 1)
+NTDOYloghigh <- log(NTDOY$High)
+NTDOYlog <- cbind(NTDOYinput, NTDOYloghigh)
+```
+
+
+```{r}
+plot(forecast111,
+     xlim = c(250, 266),
+     ylim = c(3.925, 4.35),
+     main = "ARIMA(1,1,1) Forecast",
+     ylab = "NTDOY Stock Price (log)",
+     xlab = "Time (Weeks)")
+lines(NTDOYlog[261:266,], col ='red')
+```
+
+```{r}
+plot(forecast212,
+     xlim = c(250, 266),
+     ylim = c(3.925, 4.35),
+     main = "ARIMA(2,1,2) Forecast",
+     ylab = "NTDOY Stock Price (log)",
+     xlab = "Time (Weeks)")
+lines(NTDOYlog[261:266,], col ='red')
+```
+
+```{r}
+week_NTDOY <- seq(250, 266)
+NTDOY_actual <- cbind(week_NTDOY, log(NTDOY$High[250:266]))
+week_rnn <- c(262, 263, 264, 265, 266)
+rnn_prediction <- cbind(week_rnn, log(pred_test_actual2))
+rnn_prediction
+```
+
+
+```{r}
+plot(NTDOY_actual[1:12,], type = 'l',
+     ylim = c(3.925, 4.35),
+     xlim = c(250, 266),
+     main = "RNN(4 Nodes) Forecast",
+     ylab = "NTDOY Stock Price (log)",
+     xlab = "Time (Weeks)")
+lines(NTDOY_actual[12:17,1],NTDOY_actual[12:17,2], type = 'l', col = 'red')
+lines(rnn_prediction, col = 'blue')
+```
+
+
+## Accuracy on future 5 forecasts
+```{r}
+cat('MAPE\n')
+cat('Model A(1,1,1): ', MAPE(forecast111$mean, NTDOYTest$High), '\n')
+cat('Model A(2,1,2): ', MAPE(forecast212$mean, NTDOYTest$High), '\n')
+cat('Model RNN4:     ', MAPE(pred2_test_actual, NTDOYTest$High), '\n')
+cat('\nMSE\n')
+cat('Model A(1,1,1): ', MSE(forecast111$mean, NTDOYTest$High), '\n')
+cat('Model A(2,1,2): ', MSE(forecast212$mean, NTDOYTest$High), '\n')
+cat('Model RNN4:      ', MSE(pred2_test_actual, NTDOYTest$High), '\n')
+cat('\nRMSE\n')
+cat('Model A(1,1,1): ', RMSE(forecast111$mean, NTDOYTest$High), '\n')
+cat('Model A(2,1,2): ', RMSE(forecast212$mean, NTDOYTest$High), '\n')
+cat('Model RNN4:      ', RMSE(pred2_test_actual, NTDOYTest$High), '\n')
+```
+
+

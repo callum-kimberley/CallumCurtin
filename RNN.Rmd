@@ -1,0 +1,247 @@
+---
+title: "Recurrent Neural Network"
+output: html_document
+date: "2022-08-22"
+---
+```{r}
+library(readr)
+library(quantmod)
+library(rnn)
+```
+
+
+```{r}
+NTDOY <- read_csv("D:/2022 Semester 2/MATH3004/RStudio/NTDOY.csv")
+NTDOY <- subset(NTDOY, select = c("Date", "High"))
+NTDOY$Date <- seq(as.Date("2017-05-01"),as.Date("2022-07-25"),by = 7)
+NTDOY <- NTDOY[1:266,]
+View(NTDOY)
+```
+
+# Exploring and Preparation
+```{r}
+x1 <- Lag(NTDOY$High, k=1)
+x2 <- Lag(NTDOY$High, k=2)
+x3 <- Lag(NTDOY$High, k=3)
+x4 <- Lag(NTDOY$High, k=4)
+x <- cbind(x1, x2, x3, x4, NTDOY$High)
+x <- log(x)
+head(round(x, 2))
+```
+
+```{r}
+empty_matrix <- matrix(0, nrow=length(NTDOY$High)-5, ncol = 5)
+```
+```{r}
+for(i in 1:(length(NTDOY$High)-5)){
+  empty_matrix[i,] <- NTDOY$High[i:(i+4)]
+}
+head(empty_matrix)
+x <- empty_matrix
+tail(x)
+```
+
+
+
+
+
+
+```{r}
+x <- data.matrix(x)
+range_data <- function(x) { 
+  (x - min(x))/(max(x) - min(x)) }
+
+min_data <- min(x)
+max_data <- max(x)
+min_data
+max_data
+x <- range_data(x)
+```
+
+```{r}
+x1 <- as.matrix(x[,1])
+x2 <- as.matrix(x[,2])
+x3 <- as.matrix(x[,3])
+x4 <- as.matrix(x[,4])
+y <- as.matrix(x[,5])
+```
+
+```{r}
+n_train <- 257
+y_train <- as.matrix(y[1:n_train])
+x1_train <- as.matrix(t(x1[1:n_train]))
+x2_train <- as.matrix(t(x2[1:n_train]))
+x3_train <- as.matrix(t(x3[1:n_train]))
+x4_train <- as.matrix(t(x4[1:n_train]))
+```
+
+```{r}
+nrow(x)
+ncol(x1_train)
+length(y_train)
+head(round(x,2))
+```
+
+
+
+# Train Model on Data
+
+```{r}
+x_train <- array(c(x1_train, x2_train, x3_train, x4_train),
+                 dim = c(dim(x1_train), 4))
+dim(x_train)
+#x_train
+```
+
+## Model 1 RNN
+```{r}
+set.seed(1234)
+rnn_model <- trainr(Y = t(y_train),
+                    X = x_train,
+                    learningrate = 0.05,
+                    hidden_dim = 3,
+                    numepochs = 500,
+                    network_type = 'rnn',
+                    sigmoid = "logistic")
+```
+
+```{r}
+rnn_error <- t(rnn_model$error)
+plot(rnn_error)
+```
+
+```{r}
+rnn_pred_train <- t(predictr(rnn_model, x_train))
+round(cor(y_train, rnn_pred_train), 5)
+par(pty='s')
+plot(y_train, rnn_pred_train,
+     main = "RNN(3 Nodes) Trained Values vs Actual Values",
+     ylab = "Predicted Train Values",
+     xlab = "Actual Values")
+```
+
+## Model 2 RNN
+```{r}
+set.seed(1234)
+rnn_model2 <- trainr(Y = t(y_train),
+                    X = x_train,
+                    learningrate = 0.05,
+                    hidden_dim = 4,
+                    numepochs = 500,
+                    network_type = 'rnn',
+                    sigmoid = "logistic")
+```
+
+```{r}
+rnn_error2 <- t(rnn_model2$error)
+plot(rnn_error2)
+```
+
+```{r}
+rnn_pred_train2 <- t(predictr(rnn_model2, x_train))
+round(cor(y_train, rnn_pred_train2), 5)
+par(pty='s')
+plot(y_train, rnn_pred_train2)
+```
+
+
+
+
+# Testing Model
+```{r}
+row1 <- c(65.68, 64.85, 63.66, 61.87, 57.10)
+row2 <- c(64.85, 63.66, 61.87, 57.10, 56.75)
+row3 <- c(63.66, 61.87, 57.10, 56.75, 58.24)
+row4 <- c(61.87, 57.10, 56.75, 58.24, 58.87)
+row5 <- c(57.10, 56.75, 58.24, 58.87, 56.64)
+pre_x_test <- rbind(row1, row2, row3, row4, row5)
+pre_x_test
+```
+
+
+```{r}
+x1_test <- as.matrix(t(pre_x_test[,1]))
+x2_test <- as.matrix(t(pre_x_test[,2]))
+x3_test <- as.matrix(t(pre_x_test[,3]))
+x4_test <- as.matrix(t(pre_x_test[,4]))
+y_test <- as.matrix(t(pre_x_test[,5]))
+x_test <- array(c(x1_test, x2_test, x3_test, x4_test),dim=c(dim(x1_test),  4))
+dim(x_test)
+```
+```{r}
+range_data2 <- function(x) { 
+  (x - 32.24)/(82.55 - 32.24) }
+x_test <- range_data2(x_test)
+```
+
+
+```{r}
+pred_test1 <- t(predictr(rnn_model, x_test))
+pred_test2 <- t(predictr(rnn_model2, x_test))
+pred_test1
+pred_test2
+```
+
+```{r}
+pred_test_actual <- Unscale_data(pred_test1, max_data, min_data)
+pred_test_actual2 <- Unscale_data(pred_test2, max_data, min_data)
+
+
+plot(log(NTDOY$High[262:266]),
+     ylim = c(3.9, 4.4))
+lines(log(pred_test_actual))
+lines(log(pred_test_actual2))
+```
+
+
+
+
+
+# Final Fixes and Accuracies
+```{r}
+Unscale_data <- function(x, max_x, min_x){
+  x*(max_x-min_x)+min_x
+}
+```
+
+```{r}
+y_train_actual <- Unscale_data(y_train, max_data, min_data)
+rnn_pred_train_actual <- Unscale_data(rnn_pred_train, max_data, min_data)
+rnn_pred_train_actual2 <- Unscale_data(rnn_pred_train2, max_data, min_data)
+```
+
+```{r}
+par(mfrow=c(1,1))
+plot(log(y_train_actual), type='l', main = 'NTDOY Actual vs RNN (3 Nodes)', ylab = 'NTDOY Stock Price (log)', xlab = 'Time')
+lines(log(rnn_pred_train_actual), type = 'l', col = 'red')
+plot(log(y_train_actual), type='l', main = 'NTDOY Actual vs RNN (4 Nodes)', ylab = 'NTDOY Stock Price (log)', xlab = 'Time')
+lines(log(rnn_pred_train_actual2), type = 'l', col = 'red')
+```
+
+
+
+
+
+
+
+
+
+```{r}
+library(MLmetrics)
+cat('MAPE\n')
+cat('Model RNN3: ', MAPE(log(rnn_pred_train_actual), log(y_train_actual)), '\n')
+cat('Model RNN4: ', MAPE(log(rnn_pred_train_actual2), log(y_train_actual)), '\n')
+cat('\nMSE\n') 
+cat('Model RNN3: ', MSE(log(rnn_pred_train_actual), log(y_train_actual)), '\n')
+cat('Model RNN4: ', MSE(log(rnn_pred_train_actual2), log(y_train_actual)), '\n')
+cat('\nRMSE\n')
+cat('Model RNN3: ', RMSE(log(rnn_pred_train_actual), log(y_train_actual)), '\n')
+cat('Model RNN4: ', RMSE(log(rnn_pred_train_actual2), log(y_train_actual)), '\n')
+```
+
+
+
+
+
+
+
