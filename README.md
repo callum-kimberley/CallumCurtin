@@ -1,10 +1,11 @@
 # CallumCurtin
 MATH 3004 RCode
-ARIMA.Rmd
 
-RNN.Rmd
+ARIMA.Rmd - ARIMA modelling code and model forecasts/comparisons
 
-RStudio.RProj
+RNN.Rmd - Recurrent Neural Network training and modelling code
 
-NTDOY.csv
+RStudio.RProj - R Project file
+
+NTDOY.csv - NTDOY stock data
 
